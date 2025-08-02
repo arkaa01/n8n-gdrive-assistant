@@ -1,0 +1,101 @@
+{
+  "name": "WhatsApp-GDrive Assistant",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1",
+      "name": "Trigger Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookPath": "whatsapp-in",
+      "httpMethod": "POST",
+      "responseMode": "onReceived"
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $json.body.Body;\nconst command = input.trim();\n\nlet action = '';\nif (command.startsWith('LIST')) action = 'LIST';\nelse if (command.startsWith('DELETE')) action = 'DELETE';\nelse if (command.startsWith('MOVE')) action = 'MOVE';\nelse if (command.startsWith('SUMMARY')) action = 'SUMMARY';\n\nreturn [{\n  json: {\n    command,\n    action,\n    phone: $json.body.From,\n  }\n}];"
+      },
+      "id": "2",
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"action\"]}}",
+              "value2": "LIST"
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "IF: LIST",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"action\"]}}",
+              "value2": "DELETE"
+            }
+          ]
+        }
+      },
+      "id": "4",
+      "name": "IF: DELETE",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "list",
+        "filters.parent": "={{$json.command.split(' ')[1]}}"
+      },
+      "id": "5",
+      "name": "List GDrive Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [800, 200]
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:+14155238886",
+        "to": "={{$json.phone}}",
+        "message": "={{$json.command}} executed successfully."
+      },
+      "id": "6",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1000, 200]
+    }
+  ],
+  "connections": {
+    "Trigger Webhook": {
+      "main": [[{"node": "Parse Command", "type": "main", "index": 0}]]
+    },
+    "Parse Command": {
+      "main": [[
+        {"node": "IF: LIST", "type": "main", "index": 0},
+        {"node": "IF: DELETE", "type": "main", "index": 0}
+      ]]
+    },
+    "IF: LIST": {
+      "main": [[{"node": "List GDrive Files", "type": "main", "index": 0}]]
+    },
+    "List GDrive Files": {
+      "main": [[{"node": "Send WhatsApp Reply", "type": "main", "index": 0}]]
+    }
+  }
+}
